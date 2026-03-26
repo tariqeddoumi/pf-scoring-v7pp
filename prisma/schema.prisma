@@ -1,0 +1,120 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProjectStage {
+  DEVELOPMENT
+  CONSTRUCTION
+  OPERATIONS
+  REFINANCING
+}
+
+enum BamClassification {
+  HEALTHY
+  WATCH
+  SENSITIVE
+  SUBSTANDARD
+  DOUBTFUL
+  LOSS
+}
+
+model User {
+  id           String      @id @default(cuid())
+  email        String      @unique
+  fullName     String
+  roleCode     String
+  isActive     Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  evaluations  Evaluation[] @relation("CreatedBy")
+  auditLogs    AuditLog[]
+}
+
+model Project {
+  id                String       @id @default(cuid())
+  projectCode       String       @unique
+  projectName       String
+  clientRadical     String?
+  city              String
+  country           String
+  projectType       String
+  currency          String       @default("MAD")
+  totalCostMad      Decimal      @db.Decimal(18, 2)
+  requestedDebtMad  Decimal      @db.Decimal(18, 2)
+  equityMad         Decimal      @db.Decimal(18, 2)
+  sponsorName       String?
+  offtakerName      String?
+  epcName           String?
+  omOperatorName    String?
+  stage             String?
+  description       String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  evaluations       Evaluation[]
+}
+
+model Evaluation {
+  id                   String                 @id @default(cuid())
+  projectId            String
+  createdById          String?
+  evaluationDate       DateTime               @default(now())
+  classificationBam    BamClassification
+  preAdjustmentScore   Decimal                @db.Decimal(7, 2)
+  finalScore           Decimal                @db.Decimal(7, 2)
+  finalGrade           String
+  approved             Boolean
+  commentary           String?
+  rawPayloadJson       String?
+  createdAt            DateTime               @default(now())
+  project              Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy            User?                  @relation("CreatedBy", fields: [createdById], references: [id])
+  domainScores         EvaluationDomainScore[]
+  auditLogs            AuditLog[]
+
+  @@index([projectId, evaluationDate])
+}
+
+model EvaluationDomainScore {
+  id             String      @id @default(cuid())
+  evaluationId   String
+  domainCode     String
+  domainName     String
+  weight         Decimal     @db.Decimal(6, 4)
+  rawScore       Decimal     @db.Decimal(7, 2)
+  weightedScore  Decimal     @db.Decimal(7, 2)
+  redFlag        Boolean     @default(false)
+  evaluation     Evaluation  @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+
+  @@index([evaluationId])
+}
+
+model AuditLog {
+  id            String      @id @default(cuid())
+  userId        String?
+  evaluationId  String?
+  eventType     String
+  entityType    String
+  entityId      String
+  beforeJson    String?
+  afterJson     String?
+  createdAt     DateTime    @default(now())
+  user          User?       @relation(fields: [userId], references: [id])
+  evaluation    Evaluation? @relation(fields: [evaluationId], references: [id])
+
+  @@index([entityType, entityId])
+}
+
+model LookupValue {
+  id            String    @id @default(cuid())
+  lookupGroup   String
+  code          String
+  label         String
+  sortOrder     Int       @default(0)
+  isActive      Boolean   @default(true)
+
+  @@unique([lookupGroup, code])
+}
